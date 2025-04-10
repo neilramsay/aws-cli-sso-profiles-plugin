@@ -216,9 +216,9 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
         cli_region : str
             Default CLI Region
         """
-        profile_name = (f"{sso_session}_{account_name}_{role_name}").translate(
-            str.maketrans({" ": "-", ".": "-"})
-        )
+        generated_profile_name = (
+            f"{sso_session}_{account_name}_{role_name}"
+        ).translate(str.maketrans(" .", "--"))
         profile_values = {
             "sso_session": sso_session,
             "sso_account_id": account_id,
@@ -227,11 +227,11 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
         }
 
         # Write out to console profile being written
-        uni_print(f"{profile_name}\n")
+        uni_print(f"{generated_profile_name}\n")
 
-        profile_section = profile_to_section(profile_name)
+        profile_section = profile_to_section(generated_profile_name)
         self._update_section(profile_section, profile_values)
-        self._write_new_config(profile_name)
+        self._write_new_config(generated_profile_name)
 
 
 class ValueInListValidator(Validator):
