@@ -22,19 +22,21 @@ unzip awscliv2.zip &&
 sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
 ```
 
+### AWS CLI plugin installation
+
 We need to install the Python package somewhere which is independent
 of the AWS CLI version.
 One way is to create a Python Virtual Environment for storing plugins.
 
 ```shell
-sudo python3 -m venv /usr/local/aws-cli/plugins &&
-sudo /usr/local/aws-cli/plugins/bin/pip install git+https://github.com/neilramsay/aws-cli-sso-profiles-plugin.git
+python -m venv ~/.local/share/aws-cli-plugins &&
+~/.local/share/aws-cli-plugins/bin/pip install git+https://github.com/neilramsay/aws-cli-sso-profiles-plugin.git
 ```
 
 AWS CLI needs to be configured to load the plugin on start.
 
 ```shell
-aws configure set plugins.cli_legacy_plugin_path "$(realpath /usr/local/aws-cli/plugins/lib/*/site-packages/)"
+aws configure set plugins.cli_legacy_plugin_path "$(realpath ~/.local/share/aws-cli-plugins)"
 aws configure set plugins.sso_profile aws_cli_sso_profiles_plugin.sso_profiles
 ```
 
