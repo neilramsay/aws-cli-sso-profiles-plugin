@@ -1,6 +1,6 @@
 [project]
 name = "aws-cli-sso-profiles-plugin"
-version = "0.1.0"
+version = "0.2.0"
 description = "AWS CLI Plugin to generate AWS CLI Profiles from AWS SSO Sessions"
 readme = "README.md"
 license = "Apache-2.0"

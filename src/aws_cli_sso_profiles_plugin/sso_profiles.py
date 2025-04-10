@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple, cast
 
+import botocore.config
 from awscli.customizations.configure.sso import (
     ConfigureSSOCommand,
     profile_to_section,
@@ -11,7 +12,6 @@ from awscli.customizations.sso.utils import (
 )
 from awscli.customizations.utils import uni_print
 from botocore import UNSIGNED
-from botocore.config import Config
 from prompt_toolkit.validation import ValidationError, Validator
 
 if TYPE_CHECKING:
@@ -97,6 +97,23 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
         # Choose CLI default region for profiles written to User Configuration File
         cli_region = self._get_cli_region(parsed_globals, sso_session_config)
 
+        # Push existing CLI Profiles in a Set for cross referencing later
+        self._existing_sso_profiles = {
+            SsoRole(
+                sso_session=profile_data["sso_session"],
+                account_id=profile_data["sso_account_id"],
+                role_name=profile_data["sso_role_name"],
+            ): profile_name
+            for profile_name, profile_data in cast(
+                dict[str, dict[str, dict[str, str]]], self._session.full_config
+            )
+            .get("profiles", {})
+            .items()
+            if {"sso_session", "sso_account_id", "sso_role_name"}.issubset(
+                profile_data.keys()
+            )
+        }
+
         # Authenticate against SSO so we can query Accounts and Roles
         sso_token = do_sso_login(
             session=self._session,
@@ -110,7 +127,7 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
 
         # Borrowed from aws-cli ConfigureSSOCommand._run_main
         # ---------------------8<----------------------------
-        client_config = Config(
+        client_config = botocore.config.Config(
             signature_version=UNSIGNED,
             region_name=sso_session_config["sso_region"],
         )
@@ -122,11 +139,14 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
             for role in self._get_all_roles(
                 sso_client, sso_token, account["accountId"]
             )["roleList"]:
+                sso_role = SsoRole(
+                    sso_session=sso_session_name,
+                    account_id=account["accountId"],
+                    role_name=role["roleName"],
+                )
                 self._upsert_profile(
+                    sso_role,
                     sso_session_name,
-                    account["accountName"],
-                    account["accountId"],
-                    role["roleName"],
                     cli_region,
                 )
 
@@ -195,10 +215,8 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
 
     def _upsert_profile(
         self,
-        sso_session: str,
+        sso_role: "SsoRole",
         account_name: str,
-        account_id: str,
-        role_name: str,
         cli_region: str,
     ) -> None:
         """Update Profile in User Configuration File.
@@ -217,21 +235,27 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
             Default CLI Region
         """
         generated_profile_name = (
-            f"{sso_session}_{account_name}_{role_name}"
+            f"{sso_role.sso_session}_{account_name}_{sso_role.role_name}"
         ).translate(str.maketrans(" .", "--"))
         profile_values = {
-            "sso_session": sso_session,
-            "sso_account_id": account_id,
-            "sso_role_name": role_name,
+            "sso_session": sso_role.sso_session,
+            "sso_account_id": sso_role.account_id,
+            "sso_role_name": sso_role.role_name,
             "region": cli_region,
         }
 
-        # Write out to console profile being written
-        uni_print(f"{generated_profile_name}\n")
-
-        profile_section = profile_to_section(generated_profile_name)
-        self._update_section(profile_section, profile_values)
-        self._write_new_config(generated_profile_name)
+        if profile_name := self._existing_sso_profiles.get(sso_role):
+            # Write out to console profile being skipped
+            uni_print(
+                f"{generated_profile_name} - skipping "
+                f"- already present/renamed ({profile_name})\n"
+            )
+        else:
+            # Write out to console profile being written
+            uni_print(f"Creating {generated_profile_name}\n")
+            profile_section = profile_to_section(generated_profile_name)
+            self._update_section(profile_section, profile_values)
+            self._write_new_config(generated_profile_name)
 
 
 class ValueInListValidator(Validator):
@@ -255,3 +279,9 @@ class ValueInListValidator(Validator):
         elif document.text == "" and self._default_value in self._valid_values:
             return
         self._raise_validation_error(document, self._error_message)
+
+
+class SsoRole(NamedTuple):
+    sso_session: str
+    account_id: str
+    role_name: str
