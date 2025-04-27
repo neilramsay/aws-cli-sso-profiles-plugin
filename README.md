@@ -36,7 +36,7 @@ python -m venv ~/.local/share/aws-cli-plugins &&
 AWS CLI needs to be configured to load the plugin on start.
 
 ```shell
-aws configure set plugins.cli_legacy_plugin_path "$(realpath ~/.local/share/aws-cli-plugins)"
+aws configure set plugins.cli_legacy_plugin_path "$(realpath ~/.local/share/aws-cli-plugins/lib/python3.*/site-packages | tac | paste -sd':')"
 aws configure set plugins.sso_profile aws_cli_sso_profiles_plugin.sso_profiles
 ```
 
