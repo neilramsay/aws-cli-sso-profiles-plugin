@@ -16,12 +16,13 @@ from prompt_toolkit.validation import ValidationError, Validator
 
 if TYPE_CHECKING:
     from argparse import Namespace
-    from typing import Literal, NoReturn
+    from typing import Literal, NoReturn, cast
 
     from awscli.commands import CLICommand
     from botocore.hooks import HierarchicalEmitter
     from botocore.session import Session
     from prompt_toolkit.document import Document
+    from types_boto3_sso.type_defs import ListAccountsResponseTypeDef
 
 
 def awscli_initialize(event_hooks: "HierarchicalEmitter") -> None:
@@ -136,7 +137,9 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
         # ---------------------------------------------------
 
         # Loop through Accounts and Roles to add to User Configuration File
-        for account in self._get_all_accounts(sso_client, sso_token)["accountList"]:
+        for account in cast(
+            "ListAccountsResponseTypeDef", self._get_all_accounts(sso_client, sso_token)
+        )["accountList"]:
             for role in self._get_all_roles(
                 sso_client, sso_token, account["accountId"]
             )["roleList"]:
@@ -146,9 +149,9 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
                     role_name=role["roleName"],
                 )
                 self._upsert_profile(
-                    sso_role,
-                    sso_session_name,
-                    cli_region,
+                    sso_role=sso_role,
+                    account_name=account["accountName"],
+                    cli_region=cli_region,
                 )
 
         return 0
@@ -216,6 +219,7 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
 
     def _upsert_profile(
         self,
+        *,
         sso_role: "SsoRole",
         account_name: str,
         cli_region: str,
