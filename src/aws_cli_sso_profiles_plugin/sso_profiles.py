@@ -130,6 +130,7 @@ class ConfigureSSOProfiles(ConfigureSSOCommand):
         client_config = botocore.config.Config(
             signature_version=UNSIGNED,
             region_name=sso_session_config["sso_region"],
+            retries={"max_attempts": 5, "mode": "adaptive"},
         )
         sso_client = self._session.create_client("sso", config=client_config)
         # ---------------------------------------------------
